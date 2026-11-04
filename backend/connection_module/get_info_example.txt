@@ -1,0 +1,25 @@
+{
+    "404334": {
+        "pageid": 404334,
+        "ns": 0,
+        "title": "Hampi",
+        "contentmodel": "wikitext",
+        "pagelanguage": "en",
+        "pagelanguagehtmlcode": "en",
+        "pagelanguagedir": "ltr",
+        "touched": "2026-11-03T12:50:22Z",
+        "lastrevid": 1383576086,
+        "length": 87822,
+        "protection": [],
+        "restrictiontypes": [
+            "edit",
+            "move"
+        ],
+        "watchlistlabels": [],
+        "watchers": 195,
+        "notificationtimestamp": "",
+        "fullurl": "https://en.wikipedia.org/wiki/Hampi",
+        "editurl": "https://en.wikipedia.org/w/index.php?title=Hampi&action=edit",
+        "canonicalurl": "https://en.wikipedia.org/wiki/Hampi"
+    }
+}
