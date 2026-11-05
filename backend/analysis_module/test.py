@@ -21,7 +21,21 @@ import json
 # with open('data.json', 'w', encoding='utf-8') as f:
 #     json.dump(data, f, ensure_ascii=False, indent=4)
 
-if [1, 2, 3, 4].__contains__(5):
-    print("aaa")
-else:
-    print("bbb")
+aaa = {
+    '1': 1,
+    '2': 2,
+    '3': 3
+}
+aaa1 = {
+    '1': 1,
+    '2': 2,
+    '3': 3
+}
+aaa2 = {
+    '1': [1, 2],
+    '2': 2,
+    '3': 4
+}
+b = list({frozenset(d.items()) for d in [aaa, aaa1, aaa2]})
+b = [dict(f) for f in b]
+print(b)
