@@ -148,7 +148,7 @@ class WikipediaClient(httpx.AsyncClient):
     
     # Gathers user's known languages
     # Accepts a string of text for: user, by any of username, IP, Temporary user, IP range and interwiki name 
-    # Returns
+    # Returns a list of tuples for language and level of proficiency: [(English, Native), ...] 
     async def get_user_langs(self, user):
         params = {
             'action': 'query',
@@ -157,21 +157,62 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        # "babel": {
-        #     "de": "1",
-        #     "en": "N",
-        #     "fr": "1"
-        # }
-        # TODO: make function to convert dict above to normal language
         response = await self.get(url=self.API_URL, params=params)
         if response['success']:
             data = json.loads(response['response'].text)
-            return data['query']['babel']
+            processed_data = self.__convert_lang(data['query']['babel'])
+            return processed_data
+        
+    def __convert_lang(self, langs):
+        result = []
+            
+        with open('langs.json', 'r', encoding='utf-8') as f:
+            langs_details = json.load(f)
+            for i in list(langs.keys()):
+                try:
+                    result.append((langs_details['language_code'][i], langs_details['proficiency'][langs[i]]))
+                except:
+                    continue
+                    
+        return result
+    
+    # Returns a list of 10 most viewed pages based on last day's pageviews count
+    # NOTE: Currently not working; API returns an empty list 
+    async def get_top_pages(self):
+        params = {
+            'action': 'query',
+            'list': 'mostviewed',
+            'format': 'json'
+        }
+        
+        response = await self.get(url=self.API_URL, params=params)
+        if response['success']:
+            data = json.loads(response['response'].text)
+            return data['query']['mostviewed']
+        
+    # Finds a random wikipedia article
+    # Returns a tuple with article's title and url: (title, url)
+    async def get_random_page(self):
+        params = {
+            'action': 'query',
+            'list': 'random',
+            'rnnamespace': '0',
+            'rnlimit': '1',
+            'format': 'json'
+        }
+        
+        response = await self.get(url=self.API_URL, params=params)
+        if response['success']:
+            data = json.loads(response['response'].text)
+            result_title = data['query']['random'][0]['title']
+            result_url = (await self.get_info(result_title))['fullurl']
+            return (result_title, result_url)
     
 async def main():
     # Usage example
     async with WikipediaClient() as client:
-        aaa = await client.get_revisions('Ignatius Sichelbart')
+        aaa = await client.get_random_page()
+        print(aaa)
         
         with open('data.json', 'w', encoding='utf-8') as f:
             json.dump(aaa, f, ensure_ascii=False, indent=4)
