@@ -1,0 +1,19 @@
+{
+            "id": 25547686,
+            "by": "Anachronist",
+            "byid": 524544,
+            "timestamp": "2026-11-07T10:43:09Z",
+            "expiry": "2026-11-08T10:43:09Z",
+            "duration-l10n": "1 day",
+            "reason": "[[Wikipedia:Autoblock|Autoblocked]] because your IP address was recently used by \"[[User:Ryoske|Ryoske]]\". The reason given for Ryoske's block is: \"Persistent addition of LLM-generated content after final warning\".",
+            "parsedreason": "<a href=\"/wiki/Wikipedia:Autoblock\" title=\"Wikipedia:Autoblock\">Autoblocked</a> because your IP address was recently used by &quot;<a href=\"/wiki/User:Ryoske\" title=\"User:Ryoske\">Ryoske</a>&quot;. The reason given for Ryoske&#039;s block is: &quot;Persistent addition of LLM-generated content after final warning&quot;.",
+            "automatic": "",
+            "nocreate": "",
+            "allowusertalk": "",
+            "partial": "",
+            "restrictions": {
+                "namespaces": [
+                    0
+                ]
+            }
+        },

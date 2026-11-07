@@ -1,0 +1,107 @@
+{
+    "userid": 44328505,
+    "name": "IrisChronomia",
+    "editcount": 14655,
+    "registration": "2022-08-10T19:24:43Z",
+    "groups": [
+        "extendedconfirmed",
+        "ipblock-exempt",
+        "patroller",
+        "reviewer",
+        "temporary-account-viewer",
+        "*",
+        "user",
+        "autoconfirmed"
+    ],
+    "groupmemberships": [
+        {
+            "group": "extendedconfirmed",
+            "expiry": "infinity"
+        },
+        {
+            "group": "ipblock-exempt",
+            "expiry": "2027-01-18T05:22:18Z"
+        },
+        {
+            "group": "patroller",
+            "expiry": "2026-12-02T00:00:00Z"
+        },
+        {
+            "group": "reviewer",
+            "expiry": "infinity"
+        },
+        {
+            "group": "temporary-account-viewer",
+            "expiry": "infinity"
+        }
+    ],
+    "implicitgroups": [
+        "*",
+        "user",
+        "autoconfirmed"
+    ],
+    "rights": [
+        "extendedconfirmed",
+        "ipblock-exempt",
+        "torunblocked",
+        "patrol",
+        "review",
+        "autoreview",
+        "autoconfirmed",
+        "editsemiprotected",
+        "ipinfo",
+        "ipinfo-view-full",
+        "checkuser-temporary-account",
+        "createaccount",
+        "autocreateaccount",
+        "read",
+        "edit",
+        "createtalk",
+        "viewmyprivateinfo",
+        "editmyprivateinfo",
+        "editmyoptions",
+        "abusefilter-log-detail",
+        "urlshortener-create-url",
+        "abusefilter-view",
+        "abusefilter-log",
+        "echo-read-notifications",
+        "collectionsaveasuserpage",
+        "reupload-own",
+        "move-rootuserpages",
+        "createpage",
+        "minoredit",
+        "editmyusercss",
+        "editmyuserjson",
+        "editmyuserjs",
+        "sendemail",
+        "applychangetags",
+        "viewmywatchlist",
+        "editmywatchlist",
+        "logout",
+        "spamblacklistlog",
+        "abusefilter-blocked-external-domains-log",
+        "mwoauthmanagemygrants",
+        "oathauth-enable",
+        "reportincident",
+        "reupload",
+        "upload",
+        "move",
+        "createwithcontentmodel",
+        "skipcaptcha",
+        "transcode-reset",
+        "transcode-status",
+        "createpagemainns",
+        "movestable",
+        "enrollasmentor"
+    ],
+    "emailable": "",
+    "gender": "unknown",
+    "centralids": {
+        "CentralAuth": 70387092,
+        "local": 44328505
+    },
+    "attachedlocal": {
+        "CentralAuth": "",
+        "local": ""
+    }
+}

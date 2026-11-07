@@ -1,0 +1,57 @@
+{
+        "userid": 49365040,
+        "name": "$enntteattin127",
+        "centralids": {
+            "CentralAuth": 77879785,
+            "local": 49365040
+        },
+        "attachedlocal": {
+            "CentralAuth": "",
+            "local": ""
+        },
+        "editcount": 2,
+        "recentactions": 2,
+        "registration": "2025-03-14T01:11:58Z",
+        "groups": [
+            "*",
+            "user"
+        ],
+        "implicitgroups": [
+            "*",
+            "user"
+        ],
+        "rights": [
+            "createaccount",
+            "autocreateaccount",
+            "read",
+            "edit",
+            "createtalk",
+            "viewmyprivateinfo",
+            "editmyprivateinfo",
+            "editmyoptions",
+            "abusefilter-log-detail",
+            "urlshortener-create-url",
+            "abusefilter-view",
+            "abusefilter-log",
+            "echo-read-notifications",
+            "collectionsaveasuserpage",
+            "reupload-own",
+            "move-rootuserpages",
+            "createpage",
+            "minoredit",
+            "editmyusercss",
+            "editmyuserjson",
+            "editmyuserjs",
+            "sendemail",
+            "applychangetags",
+            "viewmywatchlist",
+            "editmywatchlist",
+            "logout",
+            "spamblacklistlog",
+            "abusefilter-blocked-external-domains-log",
+            "mwoauthmanagemygrants",
+            "oathauth-enable",
+            "reportincident"
+        ],
+        "tempexpired": null
+    },
