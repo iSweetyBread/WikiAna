@@ -2,8 +2,7 @@ import httpx
 import asyncio
 import json
 import datetime
-
-url = 'https://en.wikipedia.org/w/rest.php/v1/page/Agapanthus/history'
+import random
 
 # NOTE: WikipediaClient is to be used when getting data. Use by 'with ... as ...'
 class WikipediaClient(httpx.AsyncClient):
@@ -11,28 +10,44 @@ class WikipediaClient(httpx.AsyncClient):
     
     def __init__(self, *args, **kwargs):
         headers = {'User-Agent': 'CoolBot/0.0 (https://example.org/coolbot/; coolbot@example.org)'}
-        super().__init__(headers=headers, follow_redirects=True, *args, **kwargs)
+        
+        custom_headers = kwargs.pop('headers', {})
+        headers.update(custom_headers)
+        
+        kwargs.setdefault('follow_redirects', True)
+        kwargs.setdefault('timeout', httpx.Timeout(10.0))
+        
+        super().__init__(headers=headers, *args, **kwargs)
     
     # General implementation of GET request. Handles retries and timeouts
-    async def get(self, url, params, retries = 5, timeout = 5):
+    async def request_json(self, params: dict, retries = 5) -> dict:
         for attempt in range(retries + 1):
             try:
-                response = await super().get(url=url, headers=self.headers, params=params)
-        
-                if response.status_code == 200:
-                    return {'success': True, 'response': response}
-            except Exception as e:
-                print(e)
+                response = await super().get(self.API_URL, params=params)
+                response.raise_for_status()
+                data = response.json()
+                                
+                if 'error' in data: raise Exception(f"Wikimedia API error: {data['error']}")
+                
+                return data
+
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                
+                if status not in (429, 500, 502, 503, 504): raise
+                if attempt == retries: raise
             
-            if attempt < retries:
-                await asyncio.sleep(timeout)
+            delay = min(2**attempt, 30) + random.uniform(0, 0.5)
+            print(f"API request failed; retrying in {delay} seconds")
+            
+            await asyncio.sleep(delay)
         
-        return {'success': False, 'response': None}
-    
+        raise Exception("Wikimedia API request failed")
+            
     # Implementation of opensearch functionality
     # Accepts string of text as search query and integer as limit for search suggestions
     # Returns a list of tuples for suggested pages: [(title, description, link), ...]
-    async def search(self, query_string, limit = 10):
+    async def search(self, query_string: str, limit = 10) -> list[tuple[str, str, str]] | None:
         params = {
             'action': 'opensearch',
             'namespace': '0',
@@ -42,19 +57,16 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        response = await self.get(url=self.API_URL, params=params)
-        if response['success']:
-            data = json.loads(response['response'].text)
-            titles, descs, links = data[1], data[2], data[3]
-            result = [(titles[i], descs[i], links[i]) for i in range(len(titles))]            
-            return result
-        return None
+        data = await self.request_json(params=params)
+        titles, descs, links = data[1], data[2], data[3]
+        result = [(titles[i], descs[i], links[i]) for i in range(len(titles))]            
+        return result
     
     # Gathers article's metadata
     # Accepts a string of text as a title of an article.
     # Returns a dict with basic metadata of all pages found by given title.
     # For details on metadata, see get_info_example.txt
-    async def get_info(self, title):
+    async def get_info(self, title: str) -> dict:
         params = {
             'action': 'query',
             'titles': title,
@@ -63,19 +75,16 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        response = await self.get(url=self.API_URL, params=params)
+        data = await self.request_json(params=params)
         
-        if response['success']:
-            data = json.loads(response['response'].text)
-            return data['query']['pages'][next(iter(data['query']['pages']))]
-        return None
+        return data['query']['pages'][next(iter(data['query']['pages']))]
     
     # Gathers article's revision history
     # Accepts a string of text as a title of an article.
     # Optional parameters for date and time (ISO8601) for filtering revisions by time.
     # Returns a list of dicts with data.
     # For details on data, see get_revisions_example.txt
-    async def get_revisions(self, title, start_timestamp = '2000-00-01T00:00:00Z', end_timestamp = None):
+    async def get_revisions(self, title: str, start_timestamp = '2000-00-01T00:00:00Z', end_timestamp = None) -> list[dict]:
         params = {
             'action': 'query',
             'titles': title,
@@ -91,19 +100,15 @@ class WikipediaClient(httpx.AsyncClient):
         result = []
         
         while True:
-            response = await self.get(url=self.API_URL, params=params)
+            data = await self.request_json(params=params)
             
-            if response['success']:
-                data = json.loads(response['response'].text)
-                revision_data = data['query']['pages'][next(iter(data['query']['pages']))]['revisions']
-                result.extend(revision_data)
+            revision_data = data['query']['pages'][next(iter(data['query']['pages']))]['revisions']
+            result.extend(revision_data)
                 
-                try:
-                    continue_stamp = str(data['continue']['rvcontinue']).split('|')[0]
-                    continue_stamp = datetime.datetime.strptime(continue_stamp, "%Y%m%d%H%M%S").isoformat() + 'Z'
-                    params['rvstart'] = continue_stamp                    
-                except:
-                    break
+            if 'continue' not in data: break
+                
+            continue_stamp = str(data['continue']['rvcontinue']).split('|')[0]
+            params['rvstart'] = datetime.datetime.strptime(continue_stamp, "%Y%m%d%H%M%S").isoformat() + 'Z'                    
         
         final = list({json.dumps(d, sort_keys=True) for d in result})
         final = [json.loads(d) for d in final]
@@ -113,7 +118,7 @@ class WikipediaClient(httpx.AsyncClient):
     # Gathers all links towards wikipedia articles inside a particular article
     # Accepts a string of text as a title of an article.
     # Returns a list of tuples for outgoing links: [(title, url), ...]
-    async def get_internal_links(self, title):
+    async def get_internal_links(self, title: str) -> list[tuple[str, str]]:
         params = {
             'action': 'query',
             'titles': title,
@@ -126,18 +131,14 @@ class WikipediaClient(httpx.AsyncClient):
         raw_result = []
         
         while True:
-            response = await self.get(url=self.API_URL, params=params)
+            data = await self.request_json(params=params)
             
-            if response['success']:
-                data = json.loads(response['response'].text)
-                link_data = data['query']['pages'][next(iter(data['query']['pages']))]['links']
-                raw_result.extend(link_data)
+            link_data = data['query']['pages'][next(iter(data['query']['pages']))]['links']
+            raw_result.extend(link_data)
                 
-                try:
-                    plcontinue = data['continue']['plcontinue']
-                    params['plcontinue'] = plcontinue
-                except:
-                    break
+            if 'continue' not in data: break
+
+            params['plcontinue'] = data['continue']['plcontinue']
 
         result = []
         for i in raw_result:
@@ -149,7 +150,7 @@ class WikipediaClient(httpx.AsyncClient):
     # Gathers user's known languages
     # Accepts a string of text for: user, by any of username, IP, Temporary user, IP range and interwiki name 
     # Returns a list of tuples for language and level of proficiency: [(English, Native), ...] 
-    async def get_user_langs(self, user):
+    async def get_user_langs(self, user: str) -> list[tuple[str, str]]:
         params = {
             'action': 'query',
             'meta': 'babel',
@@ -157,11 +158,9 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        response = await self.get(url=self.API_URL, params=params)
-        if response['success']:
-            data = json.loads(response['response'].text)
-            processed_data = self.__convert_lang(data['query']['babel'])
-            return processed_data
+        data = await self.request_json(params=params)
+        processed_data = self.__convert_lang(data['query']['babel'])
+        return processed_data
         
     def __convert_lang(self, langs):
         result = []
@@ -185,14 +184,12 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        response = await self.get(url=self.API_URL, params=params)
-        if response['success']:
-            data = json.loads(response['response'].text)
-            return data['query']['mostviewed']
+        data = await self.request_json(params=params)
+        return data['query']['mostviewed']
         
     # Finds a random wikipedia article
     # Returns a tuple with article's title and url: (title, url)
-    async def get_random_page(self):
+    async def get_random_page(self) -> tuple[str, str]:
         params = {
             'action': 'query',
             'list': 'random',
@@ -201,16 +198,14 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        response = await self.get(url=self.API_URL, params=params)
-        if response['success']:
-            data = json.loads(response['response'].text)
-            result_title = data['query']['random'][0]['title']
-            result_url = (await self.get_info(result_title))['fullurl']
-            return (result_title, result_url)
+        data = await self.request_json(params=params)
+        result_title = data['query']['random'][0]['title']
+        result_url = (await self.request_json_info(result_title))['fullurl']
+        return (result_title, result_url)
         
     # NOTE: finish later, currently API call returns an empty list
     # NOTE: possible values for ucshow: !autopatrolled, !minor, !new, !patrolled, !top, autopatrolled, minor, new, patrolled, top
-    async def get_user_edits(self, username, start_timestamp = '2000-00-01T00:00:00Z', end_timestamp = None, uciprange = None, ucshow = None, uctag = None):
+    async def get_user_edits(self, username: str, start_timestamp = '2000-00-01T00:00:00Z', end_timestamp = None, uciprange = None, ucshow = None, uctag = None):
         params = {
             'action': 'query',
             'list': 'usercontribs',
@@ -230,7 +225,7 @@ class WikipediaClient(httpx.AsyncClient):
     # Accepts a string of text for username.
     # Returns a dict with various user data.
     # For details on data, see get_user_info_example.txt
-    async def get_user_info(self, username):
+    async def get_user_info(self, username: str) -> dict:
         params = {
             'action': 'query',
             'list': 'users',
@@ -239,18 +234,15 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
             
-        response = await self.get(url=self.API_URL, params=params)
-        if response['success']:
-            data = json.loads(response['response'].text)
-            result_data = data['query']['users'][0]
-            return result_data
+        data = await self.request_json(params=params)
+        return data['query']['users'][0]
     
     # Gathers a list of blocked users
     # As optional parameters accepts a continue value (bkcontinue), user ids (bkids), usernames (bkusers)
     # Returns a tuple, where [0] element is a list of dictionaries with information on blocked user
     # and [1] element is a continue value (since the list is too large)
     # For details on data, see get_blocked_users_example.txt
-    async def get_blocked_users(self, bkcontinue = None, bkids = None, bkusers = None):
+    async def get_blocked_users(self, bkcontinue = None, bkids = None, bkusers = None) -> tuple[list[dict], str]:
         params = {
             'action': 'query',
             'list': 'blocks',
@@ -266,19 +258,15 @@ class WikipediaClient(httpx.AsyncClient):
         counter = 0
         
         while counter < 100:
-            response = await self.get(url=self.API_URL, params=params)
+            data = await self.request_json(params=params)
                     
-            if response['success']:
-                data = json.loads(response['response'].text)
-                block_data = data['query']['blocks']
-                result.extend(block_data)
+            block_data = data['query']['blocks']
+            result.extend(block_data)
                         
-                try:
-                    bkcontinue = data['continue']['bkcontinue']
-                    params['bkcontinue'] = bkcontinue
-                    counter += 1
-                except:
-                    break
+            if 'continue' not in data: break
+                
+            params['bkcontinue'] = data['continue']['bkcontinue']
+            counter += 1
         
         return (result, bkcontinue)
     
@@ -288,7 +276,7 @@ class WikipediaClient(httpx.AsyncClient):
     # filter out inactive users (auactiveusers)
     # Returns a list of dicts with data on users
     # For details on data, see get_users_list_example.txt
-    async def get_users_list(self, aufrom = None, auto = None, auprefix = None, augroup = None, aurights = None, auactiveusers = False):
+    async def get_users_list(self, aufrom = None, auto = None, auprefix = None, augroup = None, aurights = None, auactiveusers = False) -> list[dict]:
         params = {
             'action': 'query',
             'list': 'allusers',
@@ -306,18 +294,14 @@ class WikipediaClient(httpx.AsyncClient):
         result = []
         
         while True:
-            response = await self.get(url=self.API_URL, params=params)
+            data = await self.request_json(params=params)
                                 
-            if response['success']:
-                data = json.loads(response['response'].text)
-                user_data = data['query']['allusers']
-                result.extend(user_data)
+            user_data = data['query']['allusers']
+            result.extend(user_data)
                                     
-                try:
-                    aufrom = data['continue']['aufrom']
-                    params['aufrom'] = aufrom
-                except:
-                    break
+            if 'continue' not in data: break
+                
+            params['aufrom'] = data['continue']['aufrom']
         
         return result
     
@@ -325,9 +309,9 @@ class WikipediaClient(httpx.AsyncClient):
     # Accepts a string of text for page title; optional parameter for number of counted days (between 1 and 60)
     # Returns a dict with page view data
     # For details on data, see get_page_views_example.txt 
-    async def get_page_views(self, title, pvipdays = 30):
-        if pvipdays < 1 and pvipdays > 60:
-            raise Exception("Number of days is out of bounds (1-60)")
+    async def get_page_views(self, title: str, pvipdays = 30) -> dict:
+        if not 1 <= pvipdays <= 60:
+            raise Exception("Number of days must be between 1 and 60")
         
         params = {
             'action': 'query',
@@ -337,13 +321,9 @@ class WikipediaClient(httpx.AsyncClient):
             'format': 'json'
         }
         
-        response = await self.get(url=self.API_URL, params=params)
+        data = await self.request_json(params=params)
         
-        if response['success']:
-            data = json.loads(response['response'].text)
-            page_data = data['query']['pages'][next(iter(data['query']['pages']))]
-            return page_data
-        return None
+        return data['query']['pages'][next(iter(data['query']['pages']))]
     
     # Gathers article's deleted revision history
     # Accepts a string of text as a title of an article.
@@ -351,7 +331,7 @@ class WikipediaClient(httpx.AsyncClient):
     # Returns a list of dicts with data.
     # For details on data, see get_deleted_revisions_example.txt
     # TODO: Look up info on deleted revisions and how to view them (typical error: permision denied)
-    async def get_deleted_revisions(self, title, start_timestamp = '2000-00-01T00:00:00Z'):
+    async def get_deleted_revisions(self, title: str, start_timestamp = '2000-00-01T00:00:00Z') -> list[dict]:
         params = {
             'action': 'query',
             'titles': title,
@@ -366,22 +346,22 @@ class WikipediaClient(httpx.AsyncClient):
         result = []
     
         while True:
-            response = await self.get(url=self.API_URL, params=params)
+            data = await self.request_json(params=params)
     
-            if response['success']:
-                data = json.loads(response['response'].text)
-                revision_data = data['query']['pages'][next(iter(data['query']['pages']))]['revisions']
-                result.extend(revision_data)
+            revision_data = data['query']['pages'][next(iter(data['query']['pages']))]['revisions']
+            result.extend(revision_data)
     
-                try:
-                    continue_stamp = str(data['continue']['rvcontinue']).split('|')[0]
-                    continue_stamp = datetime.datetime.strptime(continue_stamp, "%Y%m%d%H%M%S").isoformat() + 'Z'
-                    params['rvstart'] = continue_stamp                    
-                except:
-                    break
+            if 'continue' not in data: break
+                
+            continue_stamp = str(data['continue']['rvcontinue']).split('|')[0]
+            params['rvstart'] = datetime.datetime.strptime(continue_stamp, "%Y%m%d%H%M%S").isoformat() + 'Z'                    
     
-        final = list({json.dumps(d, sort_keys=True) for d in result})
-        final = [json.loads(d) for d in final]
+        unique = {}
+
+        for revision in result:
+            unique[revision["revid"]] = revision
+
+        final = list(unique.values())
     
         return final
     
@@ -389,7 +369,7 @@ class WikipediaClient(httpx.AsyncClient):
     # Accepts a string of text for an article title
     # Returns a tuple where [0] position is a list of dicts {'userid': ..., 'name': ...}
     # And [1] position is a number of anonymous contributors 
-    async def get_page_contributors(self, title):
+    async def get_page_contributors(self, title: str) -> tuple[list[dict], int]:
         params = {
             'action': 'query',
             'prop': 'contributors',
@@ -402,18 +382,15 @@ class WikipediaClient(httpx.AsyncClient):
         anoncontributors_counter = 0
         
         while True:
-            response = await self.get(url=self.API_URL, params=params)
+            data = await self.request_json(params=params)
         
-            if response['success']:
-                data = json.loads(response['response'].text)
-                user_data = data['query']['pages'][next(iter(data['query']['pages']))]
-                result.extend(user_data['contributors'])
+            user_data = data['query']['pages'][next(iter(data['query']['pages']))]
+            result.extend(user_data['contributors'])
         
-                try:
-                    pccontinue = data['continue']['pccontinue']
-                    params['pccontinue'] = pccontinue
-                except:
-                    break
+            if 'continue' not in data: break
+                
+            params['pccontinue'] = data['continue']['pccontinue']
+
         anoncontributors_counter += user_data['anoncontributors']
         
         return (result, anoncontributors_counter)
@@ -421,7 +398,7 @@ class WikipediaClient(httpx.AsyncClient):
 async def main():
     # Usage example
     async with WikipediaClient() as client:
-        aaa = await client.get_page_contributors('MediaWiki')
+        aaa = await client.get_page_contributors('Martyrium Ignatii')
         
         with open('data.json', 'w', encoding='utf-8') as f:
             json.dump(aaa, f, ensure_ascii=False, indent=4)
