@@ -80,12 +80,12 @@ class WikipediaClient(httpx.AsyncClient):
             'action': 'query',
             'titles': title,
             'prop': 'revisions',
-            'rvprop': 'ids|flags|timestamp|user|userid|size|comment|content|tags',
+            'rvprop': 'ids|flags|timestamp|user|userid|size|comment|content|tags|sha1',
             'rvdir': 'newer',
             'rvstart': start_timestamp,
             'rvend': end_timestamp,
             'rvlimit': '50',
-            'format': 'json'
+            'format': 'json',
         }
         
         result = []
