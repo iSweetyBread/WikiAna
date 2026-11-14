@@ -24,7 +24,13 @@ dist-ssr
 *.sw?
 
 # Debug files
+aaa.txt
+db_tables.txt
 data.json
+
+# Database files
+database.ini
 
 # Virtual environment files
 .venv
+__pycache__

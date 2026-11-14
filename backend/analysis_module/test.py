@@ -1,41 +1,37 @@
-import requests
-import json
+import psycopg2
+from configparser import ConfigParser
 
-# url = 'https://en.wikipedia.org/w/rest.php/v1/page/Agapanthus/history'
-# headers = {'User-Agent': 'CoolBot/0.0 (https://example.org/coolbot/; coolbot@example.org)'}
-
-# data = []
-
-# while True:
-#     response = requests.get(url=url, headers=headers)
-#     response_data = json.loads(response.text)
+def load_config(filename = "backend/database_module/database.ini", section = "postgresql"):    
+    parser = ConfigParser()
+    parser.read(filename)
     
-#     data.append(response_data)
+    config = {}
+    if parser.has_section(section):
+        params = parser.items(section)
+        for param in params:
+            config[param[0]] = param[1]
+    else:
+        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
     
-#     try:
-#         url = response_data['older']
-#         print(url)
-#     except:
-#         break
+    return config
 
-# with open('data.json', 'w', encoding='utf-8') as f:
-#     json.dump(data, f, ensure_ascii=False, indent=4)
+def connect(config):
+    try:
+        with psycopg2.connect(**config) as conn:
+            print('Connected to the PostgreSQL server')
+            return conn
+    except (psycopg2.DatabaseError, Exception) as error:
+        print(f"Error: {error}")
 
-aaa = {
-    '1': 1,
-    '2': 2,
-    '3': 3
-}
-aaa1 = {
-    '1': 1,
-    '2': 2,
-    '3': 3
-}
-aaa2 = {
-    '1': [1, 2],
-    '2': 2,
-    '3': 4
-}
-b = list({frozenset(d.items()) for d in [aaa, aaa1, aaa2]})
-b = [dict(f) for f in b]
-print(b)
+conn = connect(load_config())
+conn.autocommit = True
+cursor = conn.cursor()
+
+sql = '''SELECT * FROM employees;'''
+
+cursor.execute(sql)
+results = cursor.fetchall()
+print(results)
+
+conn.commit()
+conn.close()
