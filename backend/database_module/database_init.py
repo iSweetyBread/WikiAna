@@ -1,6 +1,4 @@
-import psycopg2
-from connect import connect
-from config import load_config
+from connection_pool import get_conn
 
 def create_tables():
     commands = (
@@ -13,11 +11,11 @@ def create_tables():
                 parentid INT,
                 revid INT PRIMARY KEY,
                 "size" INT,
-                tags TEXT,
+                tags TEXT[],
                 "timestamp" TIMESTAMPTZ,
                 "user" VARCHAR(255),
                 userid INT,
-                cached_timestamp TIMESTAMP
+                cached_timestamp TIMESTAMPZ DEFAULT NOW()
             )
         """,
         """
@@ -27,51 +25,34 @@ def create_tables():
                 centralids JSONB,
                 attachedlocal JSONB,
                 editcount INT,
-                recentreactions INT,
+                recentactions INT,
                 registration TIMESTAMPTZ,
-                "groups" TEXT,
-                implicitgroups TEXT,
-                rights TEXT,
+                "groups" TEXT[],
+                implicitgroups TEXT[],
+                rights TEXT[],
                 tempexpired JSONB,
-                cached_timestamp TIMESTAMP
+                cached_timestamp TIMESTAMPZ DEFAULT NOW()
             )
-        """,
-        """
-            ALTER TABLE revisions
-            ADD CONSTRAINT fk_revisions_users
-            FOREIGN KEY (userid)
-            REFERENCES users(userid)
         """
     )
     
-    try:
-        conn = connect(load_config())
-        conn.autocommit = True
-        
-        with conn.cursor() as cur:
-            for command in commands:
-                cur.execute(command)
-    except (psycopg2.DatabaseError, Exception) as error:
-        print(f"database_init.py error: {error}")
-        
+    with get_conn as conn, conn.cursor() as cur:
+        for command in commands:
+            cur.execute(command)
+            
 def check_tables():
     commands = (
         """SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name = \'revisions\')""",
-        """SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name = \'userss\')"""
+        """SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name = \'users\')"""
     )
     
-    try:
-        conn = connect(load_config())
-        conn.autocommit = True
+    with get_conn as conn, conn.cursor() as cur:
+        for command in commands:
+            cur.execute(command)
+            if not cur.fetchone()[0]:
+                conn.close()
+                return False
         
-        with conn.cursor() as cur:
-            for command in commands:
-                cur.execute(command)
-                if not cur.fetchone()[0]:
-                    return False
-    except (psycopg2.DatabaseError, Exception) as error:
-        print(f"database_init.py error: {error}")
-    
     return True
         
 def init():

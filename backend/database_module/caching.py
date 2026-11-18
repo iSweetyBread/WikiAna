@@ -1,41 +1,31 @@
-from database_actions import add_entry
 import datetime
 import psycopg2.extras as pg
+import psycopg2.sql as sql
+from connection_pool import get_conn
 
-async def cache_revisions(data):
-    for entry in data:
-        data_dict = {
-            'article': entry['*'],
-            'comment': entry['comment'],
-            'contentformat': entry['contentformat'],
-            'contentmodel': entry['contentmodel'],
-            'parentid': entry['parentid'],
-            'revid': entry['revid'],
-            'size': entry['size'],
-            'tags': ', '.join(entry['tags']),
-            'timestamp': entry['timestamp'],
-            'user': entry['user'],
-            'userid': entry['userid'],
-            'cached_timestamp': datetime.datetime.now().isoformat()
-        }
-        
-        await add_entry('revisions', data_dict)
-        
-async def cache_users(data):
-    for entry in data:
-        data_dict = {
-            'userid': entry['userid'],
-            'name': entry['name'],
-            'centralids': pg.Json(entry['centralids']),
-            'attachedlocal': pg.Json(entry['attachedlocal']),
-            'edicount': entry['edicount'],
-            'recentactions': entry['recentactions'],
-            'registration': entry['registration'],
-            'groups': ', '.join(entry['groups']),
-            'implicitgroups': ', '.join(entry['implicitgroups']),
-            'rights': ', '.join(entry['rights']),
-            'tempexpired': pg.Json(entry['tempexpired']),
-            'cached_timestamp': datetime.datetime.now().isoformat()
-        }
+# Function for caching revision data in bulk
+# data -> list of dicts with revision data
+def cache_revisions(data):
+    rows = [(entry.get('*'), entry.get('comment'), entry.get('contentformat'), entry.get('contentmodel'), entry.get('parentid'), entry.get('revid'), entry.get('size'), entry.get('tags'), entry.get('timestamp'), entry.get('user'), entry.get('userid')) for entry in data]
+
+    with get_conn() as conn, conn.cursor() as cur:
+        pg.execute_values(cur, """
+            INSERT INTO revisions (article, comment, contentformat, contentmodel, parentid, revid, size, tags, timestamp, user, userid)
+            VALUES %s
+            ON CONFLICT (revid) DO NOTHING
+        """, rows)
+    conn.commit()
+
+# Function for caching user data in bulk
+# data -> list of dicts with user data
+def cache_users(data):
+    rows = [(entry.get('userid'), entry.get('name'), pg.Json(entry.get('centralids')), pg.Json(entry.get('attachedlocal')), entry.get('editcount'), entry.get('recentactions'), entry.get('registration'), entry.get('groups'), entry.get('implicitgroups'), entry.get('rights'), pg.Json(entry.get('tempexpired'))) for entry in data]
+    update_data = sql.SQL(', ').join(sql.SQL('{} = EXCLUDED.{}').format(sql.Identifier(key), sql.Identifier(key)) for key in data[0].keys() if key != 'userid')
     
-        await add_entry('users', data_dict)
+    with get_conn() as conn, conn.cursor() as cur:
+        pg.execute_values(cur, """
+            INSERT INTO users (userid, name, centralids, attachedlocal, editcount, recentactions, registration, groups, implicitgroups, rights, tempexpired)
+            VALUES %s
+            ON CONFLICT (userid) DO UPDATE SET {}
+        """.format(update_data), rows)
+    conn.commit()

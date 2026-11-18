@@ -27,6 +27,7 @@ dist-ssr
 aaa.txt
 db_tables.txt
 data.json
+test.py
 
 # Database files
 database.ini
