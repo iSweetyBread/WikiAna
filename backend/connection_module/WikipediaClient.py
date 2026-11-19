@@ -1,8 +1,12 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import httpx
 import asyncio
 import json
-import datetime
 import random
+from misc_utils.datetime_utils import (get_current_utc_time, convert_continue_to_utc_iso, get_current_midnight, convert_to_utc_iso)
 
 # NOTE: WikipediaClient is to be used when getting data. Use by 'with ... as ...'
 class WikipediaClient(httpx.AsyncClient):
@@ -108,7 +112,7 @@ class WikipediaClient(httpx.AsyncClient):
             if 'continue' not in data: break
                 
             continue_stamp = str(data['continue']['rvcontinue']).split('|')[0]
-            params['rvstart'] = datetime.datetime.strptime(continue_stamp, "%Y%m%d%H%M%S").isoformat() + 'Z'                    
+            params['rvstart'] = convert_continue_to_utc_iso(continue_stamp)                    
         
         final = list({json.dumps(d, sort_keys=True) for d in result})
         final = [json.loads(d) for d in final]
@@ -354,7 +358,7 @@ class WikipediaClient(httpx.AsyncClient):
             if 'continue' not in data: break
                 
             continue_stamp = str(data['continue']['rvcontinue']).split('|')[0]
-            params['rvstart'] = datetime.datetime.strptime(continue_stamp, "%Y%m%d%H%M%S").isoformat() + 'Z'                    
+            params['rvstart'] = convert_continue_to_utc_iso(continue_stamp)
     
         unique = {}
 
@@ -395,10 +399,45 @@ class WikipediaClient(httpx.AsyncClient):
         
         return (result, anoncontributors_counter)
     
+    # rcshow (possible valuess) -> !anon, !autopatrolled, !bot, !minor, !patrolled, !redirect, anon, autopatrolled, bot, minor, patrolled, redirect, unpatrolled
+    # rctype (possible values) -> categorize, edit, external, log, new
+    async def get_recent_changes(self, start_timestamp = get_current_utc_time(), end_timestamp = convert_to_utc_iso(get_current_midnight()), rcuser = None, rcexcludeuser = None, rcshow = None, rctype = None):
+        params = {
+            'action': 'query',
+            'list': 'recentchanges',
+            'rclimit': '500',
+            'format': 'json',
+            'rcdir': 'older',
+            'rcstart': start_timestamp,
+            'rcend': end_timestamp,
+            'rcnamespace': '0',
+            'rcprop': 'user|userid|flags|timestamp|title|ids|sizes|sha1',
+            'rcshow': rcshow,
+            'rctype': rctype,
+        }
+        
+        if rcuser: params['rcuser'] = rcuser
+        if rcexcludeuser: params['rcexcludeuser'] = rcexcludeuser
+        
+        result = []
+        
+        while True:
+            data = await self.request_json(params=params)
+            
+            revisions_data = data['query']['recentchanges']
+            result.extend(revisions_data)
+            
+            if 'continue' not in data: break
+            
+            continue_stamp = str(data['continue']['rccontinue']).split('|')[0]
+            params['rcstart'] = convert_continue_to_utc_iso(continue_stamp)
+            
+        return result
+    
 async def main():
     # Usage example
     async with WikipediaClient() as client:
-        aaa = await client.get_page_contributors('Martyrium Ignatii')
+        aaa = await client.get_recent_changes()
         
         with open('data.json', 'w', encoding='utf-8') as f:
             json.dump(aaa, f, ensure_ascii=False, indent=4)

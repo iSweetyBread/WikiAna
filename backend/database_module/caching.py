@@ -1,4 +1,3 @@
-import datetime
 import psycopg2.extras as pg
 import psycopg2.sql as sql
 from connection_pool import get_conn
