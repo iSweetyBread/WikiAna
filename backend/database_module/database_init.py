@@ -1,5 +1,6 @@
 from connection_pool import get_conn
 
+# creates tables for caching database according to the required schema
 def create_tables():
     commands = (
         """
@@ -39,7 +40,8 @@ def create_tables():
     with get_conn as conn, conn.cursor() as cur:
         for command in commands:
             cur.execute(command)
-            
+         
+# checks, if there are required caching tables in the database   
 def check_tables():
     commands = (
         """SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name = \'revisions\')""",
@@ -54,7 +56,8 @@ def check_tables():
                 return False
         
     return True
-        
+
+# initializes the required database for caching data
 def init():
     if not check_tables():
         create_tables()

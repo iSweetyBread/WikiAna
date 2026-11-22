@@ -1,5 +1,8 @@
 import datetime
 
+# quasi library to work with Wikimedia API times
+# mainly for converting between datetime objects and different datetime strings
+
 def get_current_utc_time():
     return datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 

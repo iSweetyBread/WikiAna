@@ -49,7 +49,8 @@ class WikipediaClient(httpx.AsyncClient):
         raise Exception("Wikimedia API request failed")
             
     # Implementation of opensearch functionality
-    # Accepts string of text as search query and integer as limit for search suggestions
+    # query_string -> search text
+    # limit -> integer for amount of search suggestions
     # Returns a list of tuples for suggested pages: [(title, description, link), ...]
     async def search(self, query_string: str, limit = 10) -> list[tuple[str, str, str]] | None:
         params = {
@@ -67,7 +68,7 @@ class WikipediaClient(httpx.AsyncClient):
         return result
     
     # Gathers article's metadata
-    # Accepts a string of text as a title of an article.
+    # title -> string for article title
     # Returns a dict with basic metadata of all pages found by given title.
     # For details on metadata, see get_info_example.txt
     async def get_info(self, title: str) -> dict:
@@ -84,8 +85,9 @@ class WikipediaClient(httpx.AsyncClient):
         return data['query']['pages'][next(iter(data['query']['pages']))]
     
     # Gathers article's revision history
-    # Accepts a string of text as a title of an article.
-    # Optional parameters for date and time (ISO8601) for filtering revisions by time.
+    # title -> string for article title
+    # start_timestamp, end_timestamp -> strings for date and time in ISO8601 to filter revisions
+    # exmple: '2000-00-01T00:00:00Z'
     # Returns a list of dicts with data.
     # For details on data, see get_revisions_example.txt
     async def get_revisions(self, title: str, start_timestamp = '2000-00-01T00:00:00Z', end_timestamp = None) -> list[dict]:
@@ -120,7 +122,7 @@ class WikipediaClient(httpx.AsyncClient):
         return final
     
     # Gathers all links towards wikipedia articles inside a particular article
-    # Accepts a string of text as a title of an article.
+    # title -> string for article title
     # Returns a list of tuples for outgoing links: [(title, url), ...]
     async def get_internal_links(self, title: str) -> list[tuple[str, str]]:
         params = {
@@ -152,7 +154,8 @@ class WikipediaClient(httpx.AsyncClient):
         return result
     
     # Gathers user's known languages
-    # Accepts a string of text for: user, by any of username, IP, Temporary user, IP range and interwiki name 
+    # user -> string for user identifier
+    # posssible identifiers: user, by any of username, IP, Temporary user, IP range, interwiki name 
     # Returns a list of tuples for language and level of proficiency: [(English, Native), ...] 
     async def get_user_langs(self, user: str) -> list[tuple[str, str]]:
         params = {
@@ -226,7 +229,7 @@ class WikipediaClient(httpx.AsyncClient):
         return None
     
     # Gathers information about a certain user.
-    # Accepts a string of text for username.
+    # user -> string for username
     # Returns a dict with various user data.
     # For details on data, see get_user_info_example.txt
     async def get_user_info(self, username: str) -> dict:
@@ -242,7 +245,9 @@ class WikipediaClient(httpx.AsyncClient):
         return data['query']['users'][0]
     
     # Gathers a list of blocked users
-    # As optional parameters accepts a continue value (bkcontinue), user ids (bkids), usernames (bkusers)
+    # bkcontinue -> continue value for prolonged queries; should not be assigned manualy
+    # bkids -> string for list of user ids
+    # bkusers -> string for lisst of usesrnames
     # Returns a tuple, where [0] element is a list of dictionaries with information on blocked user
     # and [1] element is a continue value (since the list is too large)
     # For details on data, see get_blocked_users_example.txt
@@ -275,9 +280,12 @@ class WikipediaClient(httpx.AsyncClient):
         return (result, bkcontinue)
     
     # Gathers a list of all users
-    # Accepts optional parameters: start first symbol (aufrom), end first symbol (auto),
-    # user prefix (auprefix), filter by user group (augroup), filter by user rights (aurights),
-    # filter out inactive users (auactiveusers)
+    # aufrom -> string of characters to start from
+    # auto -> string of characters to end by
+    # auprefix -> string of characters for user prefix
+    # augroup -> string for user group
+    # aurights -> string for list of user rights
+    # auactiveusers -> bool to exclude inactive users (False to include, True to exclude)
     # Returns a list of dicts with data on users
     # For details on data, see get_users_list_example.txt
     async def get_users_list(self, aufrom = None, auto = None, auprefix = None, augroup = None, aurights = None, auactiveusers = False) -> list[dict]:
@@ -310,7 +318,8 @@ class WikipediaClient(httpx.AsyncClient):
         return result
     
     # Gets information on views of a page
-    # Accepts a string of text for page title; optional parameter for number of counted days (between 1 and 60)
+    # title -> string for article title
+    # pvipdays -> integer for amount of counted days (between 1 and 60)
     # Returns a dict with page view data
     # For details on data, see get_page_views_example.txt 
     async def get_page_views(self, title: str, pvipdays = 30) -> dict:
@@ -370,7 +379,7 @@ class WikipediaClient(httpx.AsyncClient):
         return final
     
     # Get a list of contributors to an article
-    # Accepts a string of text for an article title
+    # title -> string for article title
     # Returns a tuple where [0] position is a list of dicts {'userid': ..., 'name': ...}
     # And [1] position is a number of anonymous contributors 
     async def get_page_contributors(self, title: str) -> tuple[list[dict], int]:
@@ -399,6 +408,9 @@ class WikipediaClient(httpx.AsyncClient):
         
         return (result, anoncontributors_counter)
     
+    # gathers a list of most recent global changes
+    # start_timestamp, end_timestamp -> strings for date and time in ISO8601 to filter revisions
+    # exmple: '2000-00-01T00:00:00Z'; by default: start_timestamp -> current utc time, end_timestamp -> utc midnight of current day
     # rcshow (possible valuess) -> !anon, !autopatrolled, !bot, !minor, !patrolled, !redirect, anon, autopatrolled, bot, minor, patrolled, redirect, unpatrolled
     # rctype (possible values) -> categorize, edit, external, log, new
     async def get_recent_changes(self, start_timestamp = get_current_utc_time(), end_timestamp = convert_to_utc_iso(get_current_midnight()), rcuser = None, rcexcludeuser = None, rcshow = None, rctype = None):
