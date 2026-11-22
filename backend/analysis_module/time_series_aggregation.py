@@ -95,6 +95,9 @@ def group_edits(raw_data, time_span = 'hour', mode = '', exclude = ''):
     averages, totals = {}, {}
     
     # gathers averages and totals for the entire data set
+    # .reindex(all_groups, fill_value=0) part is responsible for creating "0" values, if there were no edits in a certain time frame fraction
+    # i. e. if there were no edits at 10 AM, in the average gathering its amount of edits would be included as "0"
+    # same for _period_means() helper func
     averages[f'{time_span}_average'] = preprocessed_data.groupby('time_group').size().reindex(all_groups, fill_value=0).mean()
     totals['total_amount'] = len(preprocessed_data)
     
