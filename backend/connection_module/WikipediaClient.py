@@ -449,7 +449,7 @@ class WikipediaClient(httpx.AsyncClient):
 async def main():
     # Usage example
     async with WikipediaClient() as client:
-        aaa = await client.get_recent_changes()
+        aaa = await client.get_revisions('Hampi')
         
         with open('data.json', 'w', encoding='utf-8') as f:
             json.dump(aaa, f, ensure_ascii=False, indent=4)

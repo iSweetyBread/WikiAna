@@ -37,3 +37,5 @@ database.ini
 __pycache__
 
 project-plan.md
+
+data_debug

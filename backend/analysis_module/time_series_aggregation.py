@@ -141,7 +141,7 @@ def show_plot(dataframe):
     
     plt.show()
 
-with open('data.json', 'r', encoding='utf-8') as file:
+with open('data_debug/time_series_data.json', 'r', encoding='utf-8') as file:
     aaa = group_edits(json.load(file), mode='usertype|edit_size', exclude='usertype=bot|temp&edit_size=major')
     print(aaa['dataframe_averages'])
     # show_plot(aaa['final_dataframe'])
