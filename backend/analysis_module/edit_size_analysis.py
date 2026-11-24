@@ -73,7 +73,7 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
     data = []
     
     # transforms the api data into a standardised format, filters out entries, and populates the dataset
-    for i in raw_data:
+    for i in raw_data:        
         entry = {
             'text': i['*'],
             'comment': i['comment'],
@@ -87,33 +87,17 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
             'timestamp': convert_to_datetime(i['timestamp']),
             'user': i['user'],
             'userid': i['userid'],
+            'usertype': ('temp' if is_temp(i['user']) else 'bot' if is_bot(i['user']) else 'user')
         }
         if _exclude(entry, filters): data.append(entry)
         
     data = sorted(data, key=lambda x: x['timestamp'])
     
-    delta_data = []
     for i in range(len(data)):
-        delta_entry = {
-            'text': data[i]['text'],
-            'comment': data[i]['comment'],
-            'contentformat': data[i]['contentformat'],
-            'contentmodel': data[i]['contentmodel'],
-            'parentid': data[i]['parentid'],
-            'revid': data[i]['revid'],
-            'size': data[i]['size'],
-            'delta': (data[i-1]['size']-data[i]['size'] if i-1 > 0 else data[i]['size']),
-            'edit_size': data[i]['edit_size'],
-            'tags': data[i]['tags'],
-            'timestamp': data[i]['timestamp'],
-            'user': data[i]['user'],
-            'userid': data[i]['userid'],
-            'usertype': ('temp' if is_temp(data[i]['user']) else 'bot' if is_bot(data[i]['user']) else 'user')
-        }
-        delta_data.append(delta_entry)
+        data[i]['rel_delta'] = (data[i-1]['size']-data[i]['size']) * -1 if i-1 >= 0 else data[i]['size']
+        data[i]['abs_delta'] = abs(data[i-1]['size']-data[i]['size']) if i-1 >= 0 else data[i]['size']
         
-    print(delta_data[1]['delta'])
-    preprocessed_data = pd.DataFrame(delta_data)
+    preprocessed_data = pd.DataFrame(data)
     # returns an empty final dict, if the dataset is empty
     if preprocessed_data.empty:
         return {
@@ -121,7 +105,7 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
             'dataframe_averages': {},
             'entry_amount': 0
         }
-    
+            
     # establishes the given time period and converts it to the standard Pandas DataFrame format 
     preprocessed_data['timestamp'] = pd.to_datetime(preprocessed_data['timestamp'])
     time_frequencies = {
@@ -139,10 +123,33 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
     all_groups.name = 'time_group'
     
     averages = {}
+    _deltas = ['rel_delta', 'abs_delta']
     
-    print(preprocessed_data)
+    final_dataframe = preprocessed_data.groupby(['timestamp'] + _deltas).size().reset_index(name='_').drop(columns=['_'])
+        
+    for delta in _deltas:
+        # average relative and absolute delta for entire dataset
+        averages[f'average_{delta}'] = final_dataframe.mean()[delta]
+    
+        # average relative and absolute delta per time period
+        averages[f'average_{delta}_per_{time_span}'] = preprocessed_data.groupby(['time_group'])[delta].aggregate(['mean']).reindex(all_groups, fill_value=0).mean()['mean']
+        
+        # average relative and absolute delta per user type for entire dataset
+        for i, val in preprocessed_data.groupby(['timestamp', 'usertype'] + _deltas).size().reset_index(name='_').drop(columns=['_']).groupby('usertype').mean().drop(columns='timestamp')[delta].items():
+           averages[f'average_{i}_{delta}'] = np.float64(val)
+    
+        # average relative and absolute delta per user type per time period      
+        for index, value in preprocessed_data.groupby(['time_group', 'usertype'])[delta].aggregate(['mean']).groupby('usertype').mean().items():
+            for i, val in value.items():
+                averages[f'average_{i}_{delta}_per_{time_span}'] = np.float64(val)
+            
+    return {
+        'final_dataframe': final_dataframe,
+        'dataframe_averages': averages,
+        'entry_amount': len(preprocessed_data)
+    }
 
-def show_plot(dataframe):
+def show_plot(dataframe: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(10, 5))
 
     dataframe.plot(
@@ -159,6 +166,9 @@ def show_plot(dataframe):
     plt.close(fig)
 
 with open('data.json', 'r', encoding='utf-8') as file:
+    # aaa = edit_size_change_analysis(json.load(file))
+    
     aaa = edit_size_delta_analysis(json.load(file))
     # show_plot(aaa['final_dataframe'])
+    print(aaa['dataframe_averages'])
     # print(aaa['final_dataframe'])
