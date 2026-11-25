@@ -10,9 +10,6 @@ from user_type_detection import (is_temp, is_bot)
 
 import json
 
-# ==================EXPECTED RESULT================== 
-# average, total statistics (grouping by categories and sub-categories) on the delta of the changes
-
 # Function for analysing the size changes of articles over time
 # raw_data -> array of dicts containing revisions data
 # exclude_minor -> bool value to skip minor edits
@@ -23,19 +20,20 @@ def edit_size_change_analysis(raw_data, exclude_minor = False):
     for i in raw_data:
         if exclude_minor and 'minor' in i: continue
         
+        # NOTE: certain data fields are commented until they are needed
         entry = {
-            'text': i['*'],
-            'comment': i['comment'],
-            'contentformat': i['contentformat'],
-            'contentmodel': i['contentmodel'],
-            'parentid': i['parentid'],
-            'revid': i['revid'],
-            'size': i['size'],
-            'edit_size': ('minor' if 'minor' in i else 'major'),
-            'tags': i['tags'],
-            'timestamp': convert_to_datetime(i['timestamp']),
-            'user': i['user'],
-            'userid': i['userid'],
+            # 'text': i.get('*', ''),
+            # 'comment': i.get('comment', ''),
+            # 'contentformat': i.get('contentformat', ''),
+            # 'contentmodel': i.get('contentmodel', ''),
+            # 'parentid': i.get('parentid', ''),
+            # 'revid': i.get('revid', ''),
+            'size': i.get('size', ''),
+            'edit_type': ('minor' if 'minor' in i else 'major'),
+            # 'tags': i.get('tags', ''),
+            'timestamp': convert_to_datetime(i.get('timestamp', ''),),
+            # 'user': i.get('user', ''),
+            # 'userid': i.get('userid', ''),
         }
         data.append(entry)
         
@@ -49,10 +47,17 @@ def edit_size_change_analysis(raw_data, exclude_minor = False):
         
     # returns a datafram with edit sizes and their corresponding dates + number of processed entries
     return {
-        'final_dataframe': preprocessed_data.groupby(['timestamp', 'size']).size().reset_index(name='edit_count').drop(columns=['edit_count']),
+        'final_dataframe': preprocessed_data[['timestamp', 'size']].drop_duplicates(),
         'entry_amount': len(preprocessed_data)
     }
 
+# Function for calculating relative and absolute deltas of article edits
+# raw_data -> array of dicts containing revisions data
+# time_span -> string deciding a time span for aggregating changes. Default = 'hour'
+# possible values: 'minute', 'hour', 'day', 'week', 'month', 'year'
+# exclude -> key and value for removing certain data from initial dataset
+# keys and values are comgined with " = " symbol, key-value pairs are combined " & " symbol
+# possible keys: 'edit_type'
 def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
     # processes the exclude filter string into a python dict
     filters = {}
@@ -65,38 +70,36 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
     
     # helper function to exclude certain objects from the dataset
     def _exclude(obj, filters):    
-        if 'edit_size' in filters:
-            if obj['edit_size'] in filters['edit_size']: return False
+        if 'edit_type' in filters:
+            if obj['edit_type'] in filters['edit_type']: return False
         
         return True
     
     data = []
     
     # transforms the api data into a standardised format, filters out entries, and populates the dataset
-    for i in raw_data:        
+    for i in raw_data:
+        # NOTE: certain data fields are commented until they are needed
+        
         entry = {
-            'text': i['*'],
-            'comment': i['comment'],
-            'contentformat': i['contentformat'],
-            'contentmodel': i['contentmodel'],
-            'parentid': i['parentid'],
-            'revid': i['revid'],
-            'size': i['size'],
-            'edit_size': ('minor' if 'minor' in i else 'major'),
-            'tags': i['tags'],
-            'timestamp': convert_to_datetime(i['timestamp']),
-            'user': i['user'],
-            'userid': i['userid'],
-            'usertype': ('temp' if is_temp(i['user']) else 'bot' if is_bot(i['user']) else 'user')
+            # 'text': i.get('*', ''),
+            # 'comment': i.get('comment', ''),
+            # 'contentformat': i.get('contentformat', ''),
+            # 'contentmodel': i.get('contentmodel', ''),
+            # 'parentid': i.get('parentid', ''),
+            'revid': i.get('revid', ''),
+            'size': i.get('size', ''),
+            'edit_type': ('minor' if 'minor' in i else 'major'),
+            # 'tags': i.get('tags', ''),
+            'timestamp': convert_to_datetime(i.get('timestamp', ''),),
+            # 'user': i.get('user', ''),
+            # 'userid': i.get('userid', ''),
+            'usertype': ('temp' if is_temp(i.get('user', ''),) else 'bot' if is_bot(i.get('user', ''),) else 'user')
         }
         if _exclude(entry, filters): data.append(entry)
         
     data = sorted(data, key=lambda x: x['timestamp'])
-    
-    for i in range(len(data)):
-        data[i]['rel_delta'] = (data[i-1]['size']-data[i]['size']) * -1 if i-1 >= 0 else data[i]['size']
-        data[i]['abs_delta'] = abs(data[i-1]['size']-data[i]['size']) if i-1 >= 0 else data[i]['size']
-        
+            
     preprocessed_data = pd.DataFrame(data)
     # returns an empty final dict, if the dataset is empty
     if preprocessed_data.empty:
@@ -105,6 +108,10 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
             'dataframe_averages': {},
             'entry_amount': 0
         }
+    
+    # delta calculations
+    preprocessed_data['rel_delta'] = preprocessed_data['size'].diff().fillna(preprocessed_data['size'])
+    preprocessed_data['abs_delta'] = preprocessed_data['rel_delta'].abs()
             
     # establishes the given time period and converts it to the standard Pandas DataFrame format 
     preprocessed_data['timestamp'] = pd.to_datetime(preprocessed_data['timestamp'])
@@ -125,23 +132,28 @@ def edit_size_delta_analysis(raw_data, time_span = 'hour', exclude=''):
     averages = {}
     _deltas = ['rel_delta', 'abs_delta']
     
-    final_dataframe = preprocessed_data.groupby(['timestamp'] + _deltas).size().reset_index(name='_').drop(columns=['_'])
-        
+    final_dataframe = preprocessed_data[['timestamp'] + _deltas].drop_duplicates()
+    
+    # Precalculated aggregations for the loop below
+    overall_avgs = final_dataframe[_deltas].mean()
+    time_avgs = preprocessed_data.groupby('time_group')[_deltas].mean().reindex(all_groups, fill_value=0).mean()
+    user_timestamp_avgs = preprocessed_data[['timestamp', 'usertype'] + _deltas].drop_duplicates().groupby('usertype')[_deltas].mean()
+    user_time_avgs = preprocessed_data.groupby(['time_group', 'usertype'])[_deltas].mean().reindex(pd.MultiIndex.from_product([all_groups, preprocessed_data['usertype'].unique()], names=['time_group', 'usertype']), fill_value=0).groupby(level='usertype').mean()    
+    
     for delta in _deltas:
         # average relative and absolute delta for entire dataset
-        averages[f'average_{delta}'] = final_dataframe.mean()[delta]
+        averages[f'average_{delta}'] = overall_avgs[delta]
     
         # average relative and absolute delta per time period
-        averages[f'average_{delta}_per_{time_span}'] = preprocessed_data.groupby(['time_group'])[delta].aggregate(['mean']).reindex(all_groups, fill_value=0).mean()['mean']
+        averages[f'average_{delta}_per_{time_span}'] = time_avgs[delta]
         
         # average relative and absolute delta per user type for entire dataset
-        for i, val in preprocessed_data.groupby(['timestamp', 'usertype'] + _deltas).size().reset_index(name='_').drop(columns=['_']).groupby('usertype').mean().drop(columns='timestamp')[delta].items():
-           averages[f'average_{i}_{delta}'] = np.float64(val)
+        for usertype, value in user_timestamp_avgs[delta].items():
+           averages[f'average_{usertype}_{delta}'] = np.float64(value)
     
         # average relative and absolute delta per user type per time period      
-        for index, value in preprocessed_data.groupby(['time_group', 'usertype'])[delta].aggregate(['mean']).groupby('usertype').mean().items():
-            for i, val in value.items():
-                averages[f'average_{i}_{delta}_per_{time_span}'] = np.float64(val)
+        for usertype, value in user_time_avgs[delta].items():
+            averages[f'average_{usertype}_{delta}_per_{time_span}'] = np.float64(value)
             
     return {
         'final_dataframe': final_dataframe,

@@ -14,11 +14,11 @@ import json
 # time_span -> string deciding a time span for aggregating changes. Default = 'hour'
 # possible values: 'minute', 'hour', 'day', 'week', 'month', 'year'
 # mode -> key for additional aggregation. Default = 'default'
-# possible values: 'usertype', 'edit_size'; can be combined with " | " pipe symbol
+# possible values: 'usertype', 'edit_type'; can be combined with " | " pipe symbol
 # exclude -> key and value for removing certain data from initial dataset
 # keys and values are comgined with " = " symbol, key-value pairs are combined " & " symbol
-# possible keys: 'username', 'usertype', 'edit_size'
-# possible values: for 'username' -> username, for 'usertype' -> 'bot' 'temp' 'user', for 'edit_size' -> 'major' 'minor'
+# possible keys: 'username', 'usertype', 'edit_type'
+# possible values: for 'username' -> username, for 'usertype' -> 'bot' 'temp' 'user', for 'edit_type' -> 'major' 'minor'
 # values can be combined with " | " pipe symbol
 # returns a dict with: final DataFrame, total amount of entries, dict with totals for different categories, dict with averages for different categories
 def group_edits(raw_data, time_span = 'hour', mode = '', exclude = ''):
@@ -36,8 +36,8 @@ def group_edits(raw_data, time_span = 'hour', mode = '', exclude = ''):
         if 'usertype' in filters:
             if obj['usertype'] in filters['usertype']: return False
             
-        if 'edit_size' in filters:
-            if obj['edit_size'] in filters['edit_size']: return False
+        if 'edit_type' in filters:
+            if obj['edit_type'] in filters['edit_type']: return False
             
         if 'user' in filters: 
             if obj['username'] in filters['username']: return False
@@ -49,12 +49,12 @@ def group_edits(raw_data, time_span = 'hour', mode = '', exclude = ''):
     # transforms the api data into a standardised format, filters out entries, and populates the dataset
     for i in raw_data:
         entry = {
-            'revid': i['revid'],
-            'user': i['user'],
-            'userid': i['userid'],
-            'timestamp': convert_to_datetime(i['timestamp']),
+            'revid': i.get('revid', ''),
+            'user': i.get('user', ''),
+            'userid': i.get('userid', ''),
+            'timestamp': convert_to_datetime(i.get('timestamp', ''),),
             'usertype': ('temp' if 'temp' in i else 'bot' if 'bot' in i else 'user'),
-            'edit_size': ('minor' if 'minor' in i else 'major')
+            'edit_type': ('minor' if 'minor' in i else 'major')
         }
         if _exclude(entry, filters): data.append(entry)
     
@@ -89,7 +89,7 @@ def group_edits(raw_data, time_span = 'hour', mode = '', exclude = ''):
     
     # raises an exception if unhandled aggregation modes are provided
     for i in modes:
-        if i not in ['usertype', 'edit_size']:
+        if i not in ['usertype', 'edit_type']:
             raise Exception(f"Invalid aggregation mode: {i}")
                 
     averages, totals = {}, {}
@@ -142,7 +142,7 @@ def show_plot(dataframe):
     plt.show()
 
 with open('data_debug/time_series_data.json', 'r', encoding='utf-8') as file:
-    aaa = group_edits(json.load(file), mode='usertype|edit_size', exclude='usertype=bot|temp&edit_size=major')
+    aaa = group_edits(json.load(file), mode='usertype|edit_type', exclude='usertype=bot|temp&edit_type=major')
     print(aaa['dataframe_averages'])
     # show_plot(aaa['final_dataframe'])
     
